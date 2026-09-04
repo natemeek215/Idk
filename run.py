@@ -18,6 +18,10 @@ import time
 import webbrowser
 
 
+CLI_COMMANDS = ("auth", "fetch", "scan", "match", "analyze", "library",
+                "arcs", "suggest", "calibrate")
+
+
 def _venv_python() -> str | None:
     """Path to the venv interpreter, if we are not already running under it."""
     root = os.path.dirname(os.path.abspath(__file__))
@@ -72,6 +76,13 @@ def main() -> None:
     _reexec_into_venv()
 
     arguments = sys.argv[1:]
+
+    if arguments and arguments[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        print("\nCLI commands: " + ", ".join(CLI_COMMANDS))
+        print("Run 'python run.py <command> --help' for one of those.")
+        return
+
     # Anything that is not a server flag goes to the CLI.
     if arguments and not arguments[0].startswith("-"):
         from setbuilder.cli import main as cli_main
