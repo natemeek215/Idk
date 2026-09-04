@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set Builder</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0d10'/%3E%3Cpath d='M2 11 L5 7 L8 9 L11 3 L14 5' stroke='%234ade80' stroke-width='1.6' fill='none' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Set<span>Builder</span></div>
+  <nav class="tabs" id="tabs">
+    <button data-screen="setup">Setup</button>
+    <button data-screen="import">Import<span class="kbd">1</span></button>
+    <button data-screen="library">Library<span class="kbd">2</span></button>
+    <button data-screen="builder">Set builder<span class="kbd">3</span></button>
+    <button data-screen="calibrate">Calibrate<span class="kbd">4</span></button>
+    <button data-screen="export">Export<span class="kbd">5</span></button>
+  </nav>
+  <div class="topbar-right">
+    <span id="scorer-badge"></span>
+    <span id="token-badge"></span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen" id="screen-setup">
+    <div class="wrap">
+      <h1>Set up Set Builder</h1>
+      <p class="sub">Two steps, then never again.</p>
+
+      <div class="steps">
+        <div class="step-pill" id="pill-1"><i class="step-num">1</i> SoundCloud credentials</div>
+        <div class="step-pill" id="pill-2"><i class="step-num">2</i> Music folder</div>
+      </div>
+
+      <div class="card" id="setup-credentials">
+        <h2>1 · SoundCloud credentials</h2>
+        <p class="sub" style="margin-bottom:14px">
+          Set Builder reads public playlists using your own app credentials.
+          Registration is self-serve but needs an Artist Pro account.
+          <a href="https://soundcloud.com/you/apps/new" target="_blank" rel="noopener"
+             id="register-link">Register an app →</a>
+        </p>
+        <label class="field"><span>Client ID</span>
+          <input type="text" id="client-id" autocomplete="off" spellcheck="false"></label>
+        <label class="field"><span>Client Secret</span>
+          <input type="password" id="client-secret" autocomplete="off" spellcheck="false"></label>
+        <div class="row">
+          <button class="btn primary" id="save-credentials">Save and verify</button>
+          <span class="hint" style="margin:0">
+            Stored in <code>~/.setbuilder/credentials.json</code>, never in the repo.
+          </span>
+        </div>
+        <p class="hint">
+          SoundCloud allows 50 tokens per 12 hours. Set Builder caches the token to
+          disk and refreshes it rather than requesting new ones, so a normal day
+          spends one or two.
+        </p>
+        <div class="err" id="credentials-error" hidden></div>
+      </div>
+
+      <div class="card" id="setup-folders">
+        <h2>2 · Your music folder</h2>
+        <p class="sub" style="margin-bottom:12px">
+          Most of your playlist is probably already on this machine. Matching to
+          local files gives full-length audio and picks up BPM and key that
+          Serato or Rekordbox already wrote into the tags.
+        </p>
+        <div id="folder-list"><p class="hint">Looking for folders…</p></div>
+        <label class="field" style="margin-top:12px"><span>Or type a path</span>
+          <input type="text" id="folder-manual" placeholder="/Users/you/Music/DJ"></label>
+        <div class="row">
+          <button class="btn primary" id="save-folders">Scan these folders</button>
+          <button class="btn ghost" id="skip-folders">Skip — stream everything</button>
+        </div>
+        <div id="scan-progress" hidden>
+          <div class="progress"><div></div></div>
+          <div class="progress-line">
+            <span class="now"></span><span class="count"></span>
+          </div>
+        </div>
+        <div class="err" id="folders-error" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ IMPORT ============ -->
+  <section class="screen" id="screen-import">
+    <div class="wrap">
+      <h1>Import a playlist</h1>
+      <p class="sub">Paste a SoundCloud playlist URL. That is the only input.</p>
+
+      <div class="card">
+        <input type="text" id="playlist-url" spellcheck="false"
+               placeholder="https://soundcloud.com/you/sets/your-playlist"
+               style="font-size:15px; padding:12px 14px">
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="do-import">Import and analyze</button>
+          <span class="hint" style="margin:0">
+            Analysis runs on every core. Nothing is ever analysed twice.
+          </span>
+        </div>
+        <div class="err" id="import-error" hidden></div>
+      </div>
+
+      <div class="card" id="import-progress" hidden>
+        <h2 id="import-phase">Working…</h2>
+        <div class="progress"><div></div></div>
+        <div class="progress-line">
+          <span class="now"></span><span class="count"></span>
+        </div>
+        <div class="log"></div>
+      </div>
+
+      <div class="card" id="import-summary" hidden>
+        <h2>Done</h2>
+        <p id="summary-text" style="font-size:14px; margin:0 0 14px"></p>
+        <div class="row">
+          <button class="btn primary" data-goto="builder">Start building →</button>
+          <button class="btn" data-goto="library">See the library</button>
+          <button class="btn ghost" id="offer-calibrate" hidden>
+            Teach it your ear (rate 30 tracks)
+          </button>
+        </div>
+      </div>
+
+      <div class="card" id="playlist-history" hidden>
+        <h2>Imported already</h2>
+        <div id="playlist-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LIBRARY ============ -->
+  <section class="screen nopad" id="screen-library">
+    <div style="display:flex; flex-direction:column; height:100%">
+      <div style="padding:12px 16px; border-bottom:1px solid var(--line);
+                  display:flex; gap:10px; align-items:center">
+        <input type="text" id="library-search" placeholder="Filter…  (press /)"
+               style="max-width:260px">
+        <select id="library-playlist" style="width:auto; max-width:260px"></select>
+        <label class="toggle"><input type="checkbox" id="only-analyzed">
+          Analysed only</label>
+        <span class="spacer"></span>
+        <span id="library-counts" class="hint" style="margin:0"></span>
+        <button class="btn small" id="rescan-library">Rescan folders</button>
+      </div>
+      <div class="table-scroll">
+        <table class="data" id="library-table">
+          <colgroup>
+            <col class="c-num"><col><col class="c-artist"><col class="c-bpm">
+            <col class="c-key"><col class="c-energy"><col class="c-source">
+            <col class="c-action">
+          </colgroup>
+          <thead><tr>
+            <th data-sort="position">#</th>
+            <th data-sort="title">Title</th>
+            <th data-sort="artist">Artist</th>
+            <th data-sort="bpm" class="num">BPM</th>
+            <th data-sort="camelot">Key</th>
+            <th data-sort="energy" class="num">Energy</th>
+            <th data-sort="badge">Source</th>
+            <th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SET BUILDER ============ -->
+  <section class="screen nopad" id="screen-builder">
+    <div class="builder">
+      <div class="builder-left">
+        <div class="controls">
+          <label class="field"><span>Arc</span>
+            <select id="arc-select"></select></label>
+          <label class="field"><span>Set length</span>
+            <input type="number" id="set-length" min="2" max="120" value="20"></label>
+          <label class="field slider-field"><span>BPM tolerance
+              <b class="val" id="tol-val">6%</b></span>
+            <input type="range" id="bpm-tolerance" min="1" max="20" value="6"></label>
+          <label class="toggle"><input type="checkbox" id="harmonic-only">
+            Harmonic only</label>
+          <span class="spacer"></span>
+          <button class="btn small" id="edit-arc">Custom arc…</button>
+          <button class="btn small" id="clear-set">Clear</button>
+        </div>
+
+        <canvas id="chart"></canvas>
+        <div class="chart-legend">
+          <span><i style="background:var(--arc)"></i>target arc</span>
+          <span><i style="background:var(--accent)"></i>your set</span>
+          <span id="drift-summary"></span>
+        </div>
+
+        <ol class="setlist" id="setlist"></ol>
+        <p class="empty" id="setlist-empty">
+          Nothing yet. Pick from the suggestions on the right —
+          or press <kbd>1</kbd>–<kbd>5</kbd>.
+        </p>
+      </div>
+
+      <div class="builder-right">
+        <div class="slot-head">
+          <span class="n" id="slot-number">Slot 1</span>
+          <span class="target" id="slot-target"></span>
+          <span class="spacer"></span>
+          <span class="hint" style="margin:0" id="considered"></span>
+        </div>
+        <div id="suggestions"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CALIBRATE ============ -->
+  <section class="screen" id="screen-calibrate">
+    <div class="wrap">
+      <h1>Teach it your ear</h1>
+      <p class="sub">
+        Commercial tools give you their idea of energy. Rate tracks by feel and
+        Set Builder fits a model to yours. It takes over at 25 labels; 30 is a
+        good first pass. You can add more any time.
+      </p>
+
+      <div class="card calib-card" id="calib-card">
+        <div class="calib-progress" id="calib-progress"></div>
+        <div class="progress" style="margin-bottom:18px"><div></div></div>
+
+        <div class="calib-track" id="calib-title">—</div>
+        <div class="calib-artist" id="calib-artist"></div>
+
+        <div class="row" style="margin-bottom:14px">
+          <button class="btn" id="calib-play">▶ Play</button>
+          <span class="hint" style="margin:0" id="calib-current"></span>
+        </div>
+
+        <div class="rating-value" id="rating-value">5</div>
+        <input type="range" class="big" id="rating" min="1" max="10" step="0.5" value="5">
+        <div class="scale">
+          <span>1 · ambient</span><span>5 · groove</span><span>10 · peak</span>
+        </div>
+
+        <div class="row" style="margin-top:18px">
+          <button class="btn primary" id="calib-save">Save and next
+            <kbd style="margin-left:6px">↵</kbd></button>
+          <button class="btn ghost" id="calib-skip">Skip</button>
+          <span class="spacer"></span>
+          <button class="btn ghost danger small" id="calib-reset">Reset labels</button>
+        </div>
+        <p class="hint">Keys <kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd> for 10, then <kbd>Enter</kbd>.</p>
+      </div>
+
+      <div class="card" id="model-card">
+        <h2>Model</h2>
+        <div id="model-status" class="hint" style="margin:0"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn" id="refit">Refit now</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EXPORT ============ -->
+  <section class="screen" id="screen-export">
+    <div class="wrap">
+      <h1>Export</h1>
+      <p class="sub">Your current set, <span id="export-count">0 tracks</span>.</p>
+      <div class="card">
+        <label class="field"><span>Set name</span>
+          <input type="text" id="export-name" value="Set"></label>
+        <div class="row">
+          <button class="btn primary" id="export-m3u">Download M3U</button>
+          <button class="btn" id="export-txt">Download tracklist (.txt)</button>
+          <button class="btn ghost" id="copy-txt">Copy tracklist</button>
+        </div>
+        <p class="hint">
+          M3U points at your local files where they exist, and at the SoundCloud
+          permalink where they do not.
+        </p>
+      </div>
+      <div class="card">
+        <h2>Preview</h2>
+        <pre id="export-preview" style="font-family:var(--mono); font-size:11.5px;
+             color:var(--text-dim); white-space:pre-wrap; margin:0"></pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="statusbar" id="statusbar"></div>
+
+<!-- confirm-a-match dialog -->
+<dialog id="match-dialog">
+  <h2 id="match-title">Confirm match</h2>
+  <p class="hint" id="match-sub" style="margin-top:0"></p>
+  <div id="match-candidates"></div>
+  <div class="row" style="margin-top:14px">
+    <button class="btn ghost" id="match-none">None of these — leave unmatched</button>
+    <span class="spacer"></span>
+    <button class="btn" id="match-cancel">Cancel</button>
+  </div>
+</dialog>
+
+<!-- custom arc editor -->
+<dialog id="arc-dialog">
+  <h2>Custom arc</h2>
+  <p class="hint" style="margin-top:0">
+    Drag the six points. The curve is interpolated smoothly between them.
+  </p>
+  <canvas id="arc-editor"></canvas>
+  <label class="field" style="margin-top:14px"><span>Save as</span>
+    <input type="text" id="arc-name" placeholder="Friday warm-up"></label>
+  <div class="row">
+    <button class="btn primary" id="arc-save">Save arc</button>
+    <button class="btn" id="arc-use">Use without saving</button>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="arc-cancel">Cancel</button>
+  </div>
+</dialog>
+
+<audio id="player" preload="none"></audio>
+<script src="/static/app.js"></script>
+</body>
+</html>

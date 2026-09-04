@@ -1,0 +1,28 @@
+# Virtualenv
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Never commit credentials or local data. These live in ~/.setbuilder,
+# but guard against a stray copy landing in the repo.
+credentials.json
+token.json
+settings.json
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.setbuilder/
+
+# Exports and scratch audio
+*.m3u
+*.m3u8
+
+# OS
+.DS_Store
+Thumbs.db
